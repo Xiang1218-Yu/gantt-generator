@@ -170,6 +170,13 @@ func (h *Handler) AddTask(w http.ResponseWriter, r *http.Request) {
 }
 
 // UpdateTask 更新任务
+//
+// 支持局部更新：进度页面只会提交 progress 和 status，请求体中未出现的字段
+// 必须保留原任务的值。否则一次"把开发从 35 改成 60"的提交会把任务名称、起止
+// 日期、前置关系一并清空，关键路径接口随后因日期为空而报"日期不合法"。
+//
+// 实现方式：用指针字段解码请求体，以区分"字段未提供"（nil，保留原值）与
+// "字段显式置空/零值"（非 nil，覆盖），再把出现的字段合并到原任务上落盘。
 func (h *Handler) UpdateTask(w http.ResponseWriter, r *http.Request) {
 	// 路径: /api/projects/{projectId}/tasks/{taskId}
 	pathParts := strings.Split(strings.Trim(r.URL.Path, "/"), "/")
@@ -180,18 +187,94 @@ func (h *Handler) UpdateTask(w http.ResponseWriter, r *http.Request) {
 	projectID := pathParts[2]
 	taskID := pathParts[4]
 
-	var task models.Task
-	if err := parseJSON(r, &task); err != nil {
+	var req taskUpdateRequest
+	if err := parseJSON(r, &req); err != nil {
 		writeError(w, http.StatusBadRequest, "无效的请求数据: "+err.Error())
 		return
 	}
-	task.ID = taskID
 
-	if err := h.store.UpdateTask(projectID, &task); err != nil {
+	// 取出原任务作为合并基底，局部更新只覆盖请求中出现的字段。
+	project, err := h.store.GetProject(projectID)
+	if err != nil {
+		writeError(w, http.StatusNotFound, err.Error())
+		return
+	}
+	var existing *models.Task
+	for i := range project.Tasks {
+		if project.Tasks[i].ID == taskID {
+			existing = &project.Tasks[i]
+			break
+		}
+	}
+	if existing == nil {
+		writeError(w, http.StatusNotFound, "任务不存在: "+taskID)
+		return
+	}
+
+	merged := *existing
+	merged.ID = taskID
+	req.applyTo(&merged)
+
+	if merged.Name == "" {
+		writeError(w, http.StatusBadRequest, "任务名称不能为空")
+		return
+	}
+	if merged.Status == "" {
+		merged.Status = models.StatusNotStarted
+	}
+	if merged.Dependencies == nil {
+		merged.Dependencies = []string{}
+	}
+
+	if err := h.store.UpdateTask(projectID, &merged); err != nil {
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
-	writeJSON(w, http.StatusOK, task)
+	writeJSON(w, http.StatusOK, merged)
+}
+
+// taskUpdateRequest 任务更新请求体。
+// 全部使用指针字段：nil 表示请求未提供该字段（保留原值），非 nil 表示显式给出（覆盖）。
+type taskUpdateRequest struct {
+	Name         *string            `json:"name"`
+	StartDate    *string            `json:"start_date"`
+	EndDate      *string            `json:"end_date"`
+	Assignee     *string            `json:"assignee"`
+	Status       *models.TaskStatus `json:"status"`
+	Progress     *int               `json:"progress"`
+	Dependencies *[]string          `json:"dependencies"`
+}
+
+// applyTo 把请求中提供的字段覆盖到目标任务上，未提供的字段保持不变。
+func (r *taskUpdateRequest) applyTo(t *models.Task) {
+	if r == nil {
+		return
+	}
+	if r.Name != nil {
+		t.Name = *r.Name
+	}
+	if r.StartDate != nil {
+		t.StartDate = *r.StartDate
+	}
+	if r.EndDate != nil {
+		t.EndDate = *r.EndDate
+	}
+	if r.Assignee != nil {
+		t.Assignee = *r.Assignee
+	}
+	if r.Status != nil {
+		t.Status = *r.Status
+	}
+	if r.Progress != nil {
+		t.Progress = *r.Progress
+	}
+	if r.Dependencies != nil {
+		deps := *r.Dependencies
+		if deps == nil {
+			deps = []string{}
+		}
+		t.Dependencies = deps
+	}
 }
 
 // DeleteTask 删除任务
