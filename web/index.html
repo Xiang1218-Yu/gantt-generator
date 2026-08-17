@@ -1,0 +1,784 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>工程项目进度管理系统</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, "Segoe UI", Arial, sans-serif; background: #f5f7fa; color: #333; }
+        .container { max-width: 1400px; margin: 0 auto; padding: 20px; }
+        header { background: linear-gradient(135deg, #4a6fa5 0%, #6b9ac4 100%); color: white; padding: 20px; border-radius: 8px; margin-bottom: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+        header h1 { font-size: 24px; margin-bottom: 8px; }
+        header p { opacity: 0.9; font-size: 14px; }
+
+        .tabs { display: flex; gap: 4px; margin-bottom: 20px; border-bottom: 2px solid #ddd; }
+        .tab { padding: 12px 24px; cursor: pointer; border: none; background: none; font-size: 14px; color: #666; border-bottom: 3px solid transparent; margin-bottom: -2px; transition: all 0.2s; }
+        .tab:hover { color: #4a6fa5; }
+        .tab.active { color: #4a6fa5; border-bottom-color: #4a6fa5; font-weight: 600; }
+
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
+
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.06); }
+        .card h2 { font-size: 18px; margin-bottom: 16px; color: #2c3e50; padding-bottom: 12px; border-bottom: 1px solid #eee; }
+
+        .form-row { display: flex; gap: 16px; margin-bottom: 16px; flex-wrap: wrap; }
+        .form-group { flex: 1; min-width: 200px; }
+        .form-group label { display: block; margin-bottom: 6px; font-size: 13px; color: #555; font-weight: 500; }
+        .form-group input, .form-group select, .form-group textarea {
+            width: 100%; padding: 8px 12px; border: 1px solid #dcdfe6; border-radius: 4px; font-size: 14px;
+            transition: border-color 0.2s;
+        }
+        .form-group input:focus, .form-group select:focus, .form-group textarea:focus {
+            outline: none; border-color: #4a6fa5; box-shadow: 0 0 0 2px rgba(74,111,165,0.1);
+        }
+
+        .btn { padding: 8px 16px; border: none; border-radius: 4px; cursor: pointer; font-size: 14px; transition: all 0.2s; }
+        .btn-primary { background: #4a6fa5; color: white; }
+        .btn-primary:hover { background: #3a5a8c; }
+        .btn-success { background: #52c41a; color: white; }
+        .btn-success:hover { background: #43a018; }
+        .btn-danger { background: #f5222d; color: white; }
+        .btn-danger:hover { background: #d91a23; }
+        .btn-warning { background: #faad14; color: white; }
+        .btn-warning:hover { background: #d88e0b; }
+        .btn-default { background: #fff; border: 1px solid #dcdfe6; color: #606266; }
+        .btn-default:hover { background: #f5f7fa; border-color: #c0c4cc; }
+        .btn-sm { padding: 4px 10px; font-size: 12px; }
+        .btn-row { display: flex; gap: 8px; flex-wrap: wrap; }
+
+        table { width: 100%; border-collapse: collapse; }
+        th, td { padding: 12px; text-align: left; border-bottom: 1px solid #eee; font-size: 14px; }
+        th { background: #f5f7fa; font-weight: 600; color: #555; }
+        tr:hover { background: #fafbfc; }
+
+        .status-badge { padding: 3px 10px; border-radius: 12px; font-size: 12px; display: inline-block; }
+        .status-未开始 { background: #e8e8e8; color: #666; }
+        .status-进行中 { background: #e6f4ff; color: #1677ff; }
+        .status-已完成 { background: #f0f9eb; color: #52c41a; }
+        .status-延期 { background: #fff1f0; color: #f5222d; }
+
+        .critical-badge { background: #fff7e6; color: #fa8c16; padding: 2px 8px; border-radius: 4px; font-size: 11px; margin-left: 6px; }
+
+        /* 甘特图样式 */
+        .gantt-container { overflow-x: auto; border: 1px solid #e8e8e8; border-radius: 4px; }
+        .gantt-wrapper { min-width: 100%; }
+        .gantt-header, .gantt-row { display: flex; }
+        .gantt-header { background: #4a6fa5; color: white; position: sticky; top: 0; z-index: 10; }
+        .gantt-cell { padding: 8px; border-right: 1px solid #e8e8e8; flex-shrink: 0; font-size: 12px; min-height: 36px; display: flex; align-items: center; }
+        .gantt-task-name { width: 200px; font-weight: 500; }
+        .gantt-assignee { width: 100px; }
+        .gantt-timeline { flex: 1; position: relative; display: flex; border-right: none; padding: 0; }
+        .gantt-day { width: 28px; flex-shrink: 0; border-right: 1px solid #f0f0f0; text-align: center; position: relative; }
+        .gantt-day.weekend { background: #fafafa; }
+        .gantt-month { background: #5a7fb5; text-align: center; padding: 6px 4px; font-size: 12px; border-right: 1px solid #4a6fa5; }
+        .gantt-bar { position: absolute; height: 24px; top: 50%; transform: translateY(-50%); border-radius: 4px; display: flex; align-items: center; padding: 0 6px; font-size: 11px; color: white; cursor: pointer; transition: opacity 0.2s; overflow: hidden; }
+        .gantt-bar:hover { opacity: 0.85; }
+        .gantt-bar.critical { box-shadow: 0 0 0 2px #fa8c16; }
+        .bar-未开始 { background: #bfbfbf; }
+        .bar-进行中 { background: #1677ff; }
+        .bar-已完成 { background: #52c41a; }
+        .bar-延期 { background: #f5222d; }
+        .progress-indicator { position: absolute; left: 0; top: 0; bottom: 0; background: rgba(0,0,0,0.25); }
+
+        .dep-line { position: absolute; stroke: #999; stroke-width: 1.5; fill: none; pointer-events: none; }
+
+        .empty-state { text-align: center; padding: 60px 20px; color: #999; }
+        .empty-state h3 { margin-bottom: 10px; color: #666; }
+
+        .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 16px; margin-bottom: 20px; }
+        .stat-card { background: white; border-radius: 8px; padding: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.06); text-align: center; }
+        .stat-value { font-size: 32px; font-weight: 700; color: #4a6fa5; }
+        .stat-label { font-size: 13px; color: #888; margin-top: 4px; }
+
+        .progress-bar-container { background: #e8e8e8; border-radius: 4px; height: 20px; overflow: hidden; }
+        .progress-bar-fill { height: 100%; background: linear-gradient(90deg, #52c41a, #73d13d); transition: width 0.3s; display: flex; align-items: center; justify-content: flex-end; padding-right: 6px; color: white; font-size: 11px; }
+
+        .project-item { padding: 16px; border: 1px solid #eee; border-radius: 6px; margin-bottom: 12px; cursor: pointer; transition: all 0.2s; display: flex; justify-content: space-between; align-items: center; }
+        .project-item:hover { border-color: #4a6fa5; background: #f9fbff; }
+        .project-item.selected { border-color: #4a6fa5; background: #e6f0ff; }
+        .project-info h3 { font-size: 15px; margin-bottom: 4px; }
+        .project-info p { font-size: 12px; color: #888; }
+
+        .modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); display: none; align-items: center; justify-content: center; z-index: 1000; }
+        .modal-overlay.show { display: flex; }
+        .modal { background: white; border-radius: 8px; padding: 24px; max-width: 500px; width: 90%; max-height: 90vh; overflow-y: auto; }
+        .modal h3 { margin-bottom: 16px; padding-bottom: 12px; border-bottom: 1px solid #eee; }
+        .modal-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 20px; }
+
+        .report-section { margin-bottom: 24px; }
+        .report-section h3 { font-size: 16px; margin-bottom: 12px; color: #2c3e50; padding-left: 10px; border-left: 3px solid #4a6fa5; }
+        .report-task-item { padding: 12px; border: 1px solid #eee; border-radius: 6px; margin-bottom: 8px; }
+        .report-task-delayed { border-left: 3px solid #f5222d; background: #fffbfb; }
+        .report-task-critical { border-left: 3px solid #fa8c16; }
+
+        textarea { resize: vertical; min-height: 80px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>📊 工程项目进度管理系统</h1>
+            <p>任务管理 · 关键路径分析 · 甘特图生成 · 进度报告</p>
+        </header>
+
+        <div class="tabs">
+            <button class="tab active" onclick="switchTab('projects')">📁 项目管理</button>
+            <button class="tab" onclick="switchTab('tasks')">📋 任务管理</button>
+            <button class="tab" onclick="switchTab('gantt')">📈 甘特图</button>
+            <button class="tab" onclick="switchTab('report')">📑 进度报告</button>
+        </div>
+
+        <!-- 项目管理 -->
+        <div id="tab-projects" class="tab-content active">
+            <div class="card">
+                <h2>新建项目</h2>
+                <div class="form-row">
+                    <div class="form-group" style="flex: 2;">
+                        <label>项目名称</label>
+                        <input type="text" id="newProjectName" placeholder="请输入项目名称">
+                    </div>
+                </div>
+                <button class="btn btn-primary" onclick="createProject()">➕ 创建项目</button>
+            </div>
+
+            <div class="card">
+                <h2>项目列表</h2>
+                <div id="projectList"></div>
+            </div>
+        </div>
+
+        <!-- 任务管理 -->
+        <div id="tab-tasks" class="tab-content">
+            <div class="card">
+                <h2>当前项目: <span id="currentProjectName">请先选择项目</span></h2>
+            </div>
+
+            <div class="card">
+                <h2>添加任务</h2>
+                <div class="form-row">
+                    <div class="form-group" style="flex: 2;">
+                        <label>任务名称 *</label>
+                        <input type="text" id="taskName" placeholder="请输入任务名称">
+                    </div>
+                    <div class="form-group">
+                        <label>负责人</label>
+                        <input type="text" id="taskAssignee" placeholder="负责人姓名">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>开始日期 *</label>
+                        <input type="date" id="taskStartDate">
+                    </div>
+                    <div class="form-group">
+                        <label>结束日期 *</label>
+                        <input type="date" id="taskEndDate">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>前置依赖（可多选）</label>
+                        <select id="taskDependencies" multiple style="min-height: 80px;"></select>
+                        <small style="color: #888;">按住Ctrl/Mac键可多选</small>
+                    </div>
+                    <div class="form-group">
+                        <label>初始状态</label>
+                        <select id="taskStatus">
+                            <option value="未开始">未开始</option>
+                            <option value="进行中">进行中</option>
+                            <option value="已完成">已完成</option>
+                            <option value="延期">延期</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>进度 (%)</label>
+                        <input type="number" id="taskProgress" min="0" max="100" value="0">
+                    </div>
+                </div>
+                <button class="btn btn-primary" onclick="addTask()">➕ 添加任务</button>
+            </div>
+
+            <div class="card">
+                <h2>任务列表</h2>
+                <table id="taskTable">
+                    <thead>
+                        <tr>
+                            <th>任务名称</th>
+                            <th>负责人</th>
+                            <th>开始日期</th>
+                            <th>结束日期</th>
+                            <th>前置依赖</th>
+                            <th>状态</th>
+                            <th>进度</th>
+                            <th>关键路径</th>
+                            <th>操作</th>
+                        </tr>
+                    </thead>
+                    <tbody id="taskTableBody">
+                        <tr><td colspan="9" class="empty-state">请先添加任务</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- 甘特图 -->
+        <div id="tab-gantt" class="tab-content">
+            <div class="card">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+                    <h2 style="margin-bottom: 0; border: none; padding: 0;">甘特图视图</h2>
+                    <div>
+                        <button class="btn btn-success" onclick="downloadGanttPDF()">⬇️ 导出PDF甘特图</button>
+                    </div>
+                </div>
+                <div id="criticalPathInfo" style="margin-bottom: 16px; padding: 12px; background: #fff7e6; border-radius: 4px; display: none;">
+                    <strong>🔥 关键路径：</strong><span id="criticalPathText"></span>
+                    <span style="margin-left: 20px;"><strong>📅 总工期：</strong><span id="totalDurationText"></span> 天</span>
+                </div>
+                <div class="gantt-container">
+                    <div id="ganttChart" class="empty-state">
+                        <h3>暂无数据</h3>
+                        <p>请先创建项目并添加任务后查看甘特图</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 进度报告 -->
+        <div id="tab-report" class="tab-content">
+            <div class="card">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+                    <h2 style="margin-bottom: 0; border: none; padding: 0;">项目进度报告</h2>
+                    <div>
+                        <button class="btn btn-default" onclick="downloadTextReport()">⬇️ 下载文本报告</button>
+                    </div>
+                </div>
+                <div id="reportContent">
+                    <div class="empty-state">
+                        <h3>暂无数据</h3>
+                        <p>请先创建项目并添加任务后查看报告</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 任务编辑弹窗 -->
+    <div class="modal-overlay" id="editModal">
+        <div class="modal">
+            <h3>编辑任务</h3>
+            <input type="hidden" id="editTaskId">
+            <div class="form-row">
+                <div class="form-group" style="flex: 2;">
+                    <label>任务名称 *</label>
+                    <input type="text" id="editTaskName">
+                </div>
+                <div class="form-group">
+                    <label>负责人</label>
+                    <input type="text" id="editTaskAssignee">
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>开始日期 *</label>
+                    <input type="date" id="editTaskStartDate">
+                </div>
+                <div class="form-group">
+                    <label>结束日期 *</label>
+                    <input type="date" id="editTaskEndDate">
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>状态</label>
+                    <select id="editTaskStatus">
+                        <option value="未开始">未开始</option>
+                        <option value="进行中">进行中</option>
+                        <option value="已完成">已完成</option>
+                        <option value="延期">延期</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>进度 (%)</label>
+                    <input type="number" id="editTaskProgress" min="0" max="100">
+                </div>
+            </div>
+            <div class="form-group">
+                <label>前置依赖（多选）</label>
+                <select id="editTaskDependencies" multiple style="min-height: 80px;"></select>
+            </div>
+            <div class="modal-actions">
+                <button class="btn btn-default" onclick="closeModal()">取消</button>
+                <button class="btn btn-primary" onclick="saveTask()">保存</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let currentProjectId = null;
+        let currentProject = null;
+        let criticalPathResult = null;
+
+        // ========== 通用函数 ==========
+        async function api(url, options = {}) {
+            const res = await fetch(url, {
+                headers: { 'Content-Type': 'application/json', ...(options.headers || {}) },
+                ...options
+            });
+            const text = await res.text();
+            let data;
+            try { data = JSON.parse(text); } catch { data = text; }
+            if (!res.ok) {
+                alert(typeof data === 'object' ? data.error : '请求失败');
+                throw new Error(typeof data === 'object' ? data.error : '请求失败');
+            }
+            return data;
+        }
+
+        function switchTab(name) {
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+            event.target.classList.add('active');
+            document.getElementById('tab-' + name).classList.add('active');
+            if (name === 'gantt') renderGantt();
+            if (name === 'report') renderReport();
+            if (name === 'tasks') { renderTasks(); renderDependenciesSelect('taskDependencies'); }
+        }
+
+        // ========== 项目管理 ==========
+        async function loadProjects() {
+            const projects = await api('/api/projects');
+            const list = document.getElementById('projectList');
+            if (projects.length === 0) {
+                list.innerHTML = '<div class="empty-state"><h3>暂无项目</h3><p>请创建一个新项目开始使用</p></div>';
+                return;
+            }
+            list.innerHTML = projects.map(p => `
+                <div class="project-item ${p.id === currentProjectId ? 'selected' : ''}" onclick="selectProject('${p.id}')">
+                    <div class="project-info">
+                        <h3>${escapeHtml(p.name)}</h3>
+                        <p>任务数: ${p.tasks ? p.tasks.length : 0} | 更新于: ${new Date(p.updated_at || p.created_at).toLocaleString('zh-CN')}</p>
+                    </div>
+                    <div class="btn-row">
+                        <button class="btn btn-danger btn-sm" onclick="event.stopPropagation(); deleteProject('${p.id}')">删除</button>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        async function createProject() {
+            const name = document.getElementById('newProjectName').value.trim();
+            if (!name) { alert('请输入项目名称'); return; }
+            await api('/api/projects', { method: 'POST', body: JSON.stringify({ name }) });
+            document.getElementById('newProjectName').value = '';
+            loadProjects();
+            alert('项目创建成功');
+        }
+
+        async function selectProject(id) {
+            currentProjectId = id;
+            currentProject = await api('/api/projects/' + id);
+            document.getElementById('currentProjectName').textContent = currentProject.name;
+            loadProjects();
+            renderTasks();
+            renderDependenciesSelect('taskDependencies');
+            // 加载关键路径数据
+            try {
+                criticalPathResult = await api('/api/projects/' + id + '/critical-path');
+            } catch(e) {
+                criticalPathResult = null;
+            }
+        }
+
+        async function deleteProject(id) {
+            if (!confirm('确定删除此项目吗？所有任务数据将丢失。')) return;
+            await api('/api/projects/' + id, { method: 'DELETE' });
+            if (currentProjectId === id) {
+                currentProjectId = null;
+                currentProject = null;
+                document.getElementById('currentProjectName').textContent = '请先选择项目';
+            }
+            loadProjects();
+            renderTasks();
+        }
+
+        // ========== 任务管理 ==========
+        function renderDependenciesSelect(selectId, excludeTaskId = null) {
+            const select = document.getElementById(selectId);
+            if (!currentProject || !currentProject.tasks) { select.innerHTML = ''; return; }
+            const tasks = currentProject.tasks.filter(t => t.id !== excludeTaskId);
+            select.innerHTML = tasks.map(t => `<option value="${t.id}">${escapeHtml(t.name)}</option>`).join('');
+        }
+
+        function renderTasks() {
+            const tbody = document.getElementById('taskTableBody');
+            if (!currentProject || !currentProject.tasks || currentProject.tasks.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="9" class="empty-state">请先添加任务</td></tr>';
+                return;
+            }
+
+            const taskInfo = criticalPathResult ? criticalPathResult.task_info : {};
+            const criticalIds = criticalPathResult ? criticalPathResult.critical_path : [];
+
+            tbody.innerHTML = currentProject.tasks.map(t => {
+                const isCritical = criticalIds.includes(t.id);
+                const depNames = (t.dependencies || []).map(did => {
+                    const dep = currentProject.tasks.find(x => x.id === did);
+                    return dep ? dep.name : did;
+                }).join(', ');
+                return `
+                <tr>
+                    <td>${escapeHtml(t.name)} ${isCritical ? '<span class="critical-badge">关键</span>' : ''}</td>
+                    <td>${escapeHtml(t.assignee || '-')}</td>
+                    <td>${t.start_date}</td>
+                    <td>${t.end_date}</td>
+                    <td style="font-size:12px;color:#666;">${escapeHtml(depNames || '-')}</td>
+                    <td><span class="status-badge status-${t.status}">${t.status}</span></td>
+                    <td>
+                        <div style="display:flex;align-items:center;gap:6px;">
+                            <div style="flex:1;" class="progress-bar-container">
+                                <div class="progress-bar-fill" style="width:${t.progress}%;${t.progress > 0 ? 'min-width:24px;' : ''}">${t.progress > 15 ? t.progress + '%' : ''}</div>
+                            </div>
+                            <span style="font-size:12px;">${t.progress}%</span>
+                        </div>
+                    </td>
+                    <td>${isCritical ? '✅' : '-'}</td>
+                    <td>
+                        <button class="btn btn-primary btn-sm" onclick='openEditModal(${JSON.stringify(t).replace(/'/g, "&#39;")})'>编辑</button>
+                        <button class="btn btn-danger btn-sm" onclick="deleteTask('${t.id}')">删除</button>
+                    </td>
+                </tr>`;
+            }).join('');
+        }
+
+        async function addTask() {
+            if (!currentProjectId) { alert('请先选择项目'); return; }
+            const name = document.getElementById('taskName').value.trim();
+            if (!name) { alert('请输入任务名称'); return; }
+            const startDate = document.getElementById('taskStartDate').value;
+            const endDate = document.getElementById('taskEndDate').value;
+            if (!startDate || !endDate) { alert('请选择开始和结束日期'); return; }
+            if (startDate > endDate) { alert('结束日期不能早于开始日期'); return; }
+
+            const depsSelect = document.getElementById('taskDependencies');
+            const dependencies = Array.from(depsSelect.selectedOptions).map(o => o.value);
+
+            const task = {
+                name,
+                start_date: startDate,
+                end_date: endDate,
+                assignee: document.getElementById('taskAssignee').value.trim(),
+                status: document.getElementById('taskStatus').value,
+                progress: parseInt(document.getElementById('taskProgress').value) || 0,
+                dependencies
+            };
+
+            await api('/api/projects/' + currentProjectId + '/tasks', {
+                method: 'POST',
+                body: JSON.stringify(task)
+            });
+
+            // 刷新
+            await selectProject(currentProjectId);
+            // 清空表单
+            ['taskName', 'taskAssignee', 'taskStartDate', 'taskEndDate', 'taskProgress'].forEach(id => document.getElementById(id).value = '');
+            document.getElementById('taskStatus').value = '未开始';
+            document.getElementById('taskProgress').value = '0';
+            alert('任务添加成功');
+        }
+
+        function openEditModal(task) {
+            document.getElementById('editTaskId').value = task.id;
+            document.getElementById('editTaskName').value = task.name;
+            document.getElementById('editTaskAssignee').value = task.assignee || '';
+            document.getElementById('editTaskStartDate').value = task.start_date;
+            document.getElementById('editTaskEndDate').value = task.end_date;
+            document.getElementById('editTaskStatus').value = task.status;
+            document.getElementById('editTaskProgress').value = task.progress;
+            renderDependenciesSelect('editTaskDependencies', task.id);
+            // 选中现有依赖
+            const sel = document.getElementById('editTaskDependencies');
+            Array.from(sel.options).forEach(o => {
+                o.selected = (task.dependencies || []).includes(o.value);
+            });
+            document.getElementById('editModal').classList.add('show');
+        }
+
+        function closeModal() {
+            document.getElementById('editModal').classList.remove('show');
+        }
+
+        async function saveTask() {
+            if (!currentProjectId) return;
+            const id = document.getElementById('editTaskId').value;
+            const name = document.getElementById('editTaskName').value.trim();
+            if (!name) { alert('请输入任务名称'); return; }
+            const startDate = document.getElementById('editTaskStartDate').value;
+            const endDate = document.getElementById('editTaskEndDate').value;
+            if (!startDate || !endDate) { alert('请选择日期'); return; }
+
+            const depsSelect = document.getElementById('editTaskDependencies');
+            const dependencies = Array.from(depsSelect.selectedOptions).map(o => o.value);
+
+            await api(`/api/projects/${currentProjectId}/tasks/${id}`, {
+                method: 'PUT',
+                body: JSON.stringify({
+                    name,
+                    start_date: startDate,
+                    end_date: endDate,
+                    assignee: document.getElementById('editTaskAssignee').value.trim(),
+                    status: document.getElementById('editTaskStatus').value,
+                    progress: parseInt(document.getElementById('editTaskProgress').value) || 0,
+                    dependencies
+                })
+            });
+            closeModal();
+            await selectProject(currentProjectId);
+            alert('任务更新成功');
+        }
+
+        async function deleteTask(taskId) {
+            if (!confirm('确定删除此任务吗？')) return;
+            await api(`/api/projects/${currentProjectId}/tasks/${taskId}`, { method: 'DELETE' });
+            await selectProject(currentProjectId);
+        }
+
+        // ========== 甘特图 ==========
+        async function renderGantt() {
+            const container = document.getElementById('ganttChart');
+            if (!currentProject || !currentProject.tasks || currentProject.tasks.length === 0) {
+                container.className = 'empty-state';
+                container.innerHTML = '<h3>暂无数据</h3><p>请先创建项目并添加任务后查看甘特图</p>';
+                document.getElementById('criticalPathInfo').style.display = 'none';
+                return;
+            }
+
+            // 计算关键路径
+            try {
+                criticalPathResult = await api('/api/projects/' + currentProjectId + '/critical-path');
+            } catch(e) { return; }
+
+            const criticalIds = criticalPathResult.critical_path || [];
+            const taskInfo = criticalPathResult.task_info || {};
+
+            // 显示关键路径信息
+            document.getElementById('criticalPathInfo').style.display = 'block';
+            document.getElementById('totalDurationText').textContent = criticalPathResult.total_duration;
+            document.getElementById('criticalPathText').textContent = criticalIds.map(id => {
+                const t = currentProject.tasks.find(x => x.id === id);
+                return t ? t.name : id;
+            }).join(' → ') || '无';
+
+            // 计算日期范围
+            const dates = [];
+            currentProject.tasks.forEach(t => {
+                dates.push(new Date(t.start_date));
+                dates.push(new Date(t.end_date));
+            });
+            const minDate = new Date(Math.min(...dates));
+            const maxDate = new Date(Math.max(...dates));
+            // 扩展几天
+            minDate.setDate(minDate.getDate() - 1);
+            maxDate.setDate(maxDate.getDate() + 1);
+
+            // 生成所有天
+            const days = [];
+            const d = new Date(minDate);
+            while (d <= maxDate) {
+                days.push(new Date(d));
+                d.setDate(d.getDate() + 1);
+            }
+
+            // 构建月份表头
+            const months = [];
+            let lastMonthKey = '';
+            days.forEach((day, idx) => {
+                const key = `${day.getFullYear()}-${day.getMonth()}`;
+                if (key !== lastMonthKey) {
+                    lastMonthKey = key;
+                    months.push({ label: `${day.getMonth() + 1}月`, startIdx: idx, count: 1 });
+                } else {
+                    months[months.length - 1].count++;
+                }
+            });
+
+            const taskWidth = 200;
+            const assigneeWidth = 100;
+            const dayWidth = 28;
+
+            // 排序任务
+            const sortedTasks = [...currentProject.tasks].sort((a, b) => new Date(a.start_date) - new Date(b.start_date));
+
+            let html = '<div class="gantt-wrapper" style="width:' + (taskWidth + assigneeWidth + days.length * dayWidth) + 'px;">';
+
+            // 月份行
+            html += '<div class="gantt-row" style="background:#3a5a8c;color:white;">';
+            html += `<div class="gantt-cell" style="width:${taskWidth}px;background:#4a6fa5;"><b>任务</b></div>`;
+            html += `<div class="gantt-cell" style="width:${assigneeWidth}px;background:#4a6fa5;"><b>负责人</b></div>`;
+            html += '<div class="gantt-timeline" style="display:flex;">';
+            months.forEach(m => {
+                html += `<div class="gantt-month" style="width:${m.count * dayWidth}px;border-right:1px solid #3a5a8c;">${m.label}</div>`;
+            });
+            html += '</div></div>';
+
+            // 日期行
+            html += '<div class="gantt-header">';
+            html += `<div class="gantt-cell" style="width:${taskWidth}px;">日期</div>`;
+            html += `<div class="gantt-cell" style="width:${assigneeWidth}px;"> </div>`;
+            html += '<div class="gantt-timeline">';
+            days.forEach(day => {
+                const isWeekend = day.getDay() === 0 || day.getDay() === 6;
+                const isStart = day.getDate() === 1 || days.indexOf(day) === 0;
+                html += `<div class="gantt-day${isWeekend ? ' weekend' : ''}" style="width:${dayWidth}px;padding:4px 0;font-size:11px;${isStart ? 'color:#fff;font-weight:600;' : 'color:rgba(255,255,255,0.7);'}">${day.getDate()}</div>`;
+            });
+            html += '</div></div>';
+
+            // 任务行
+            sortedTasks.forEach((task, idx) => {
+                const info = taskInfo[task.id] || {};
+                const isCritical = criticalIds.includes(task.id);
+                const startOffset = days.findIndex(d => d.toDateString() === new Date(task.start_date).toDateString());
+                const endOffset = days.findIndex(d => d.toDateString() === new Date(task.end_date).toDateString());
+                const barStart = startOffset >= 0 ? startOffset : 0;
+                const barWidth = endOffset >= 0 ? (endOffset - startOffset + 1) * dayWidth : dayWidth * 2;
+
+                const rowBg = idx % 2 === 0 ? '#fafbfc' : '#ffffff';
+
+                html += `<div class="gantt-row" style="background:${rowBg};min-height:50px;">`;
+                html += `<div class="gantt-cell" style="width:${taskWidth}px;position:relative;"><b>${escapeHtml(task.name)}</b>${isCritical ? '<span class="critical-badge" style="position:absolute;right:6px;">K</span>' : ''}</div>`;
+                html += `<div class="gantt-cell" style="width:${assigneeWidth}px;color:#666;">${escapeHtml(task.assignee || '-')}</div>`;
+                html += `<div class="gantt-timeline" style="position:relative;height:50px;">`;
+
+                // 周末背景
+                days.forEach((day, di) => {
+                    if (day.getDay() === 0 || day.getDay() === 6) {
+                        html += `<div style="position:absolute;left:${di * dayWidth}px;top:0;bottom:0;width:${dayWidth}px;background:#fafafa;border-right:1px solid #f0f0f0;"></div>`;
+                    }
+                });
+
+                // 今天标记
+                const today = new Date();
+                today.setHours(0,0,0,0);
+                const todayIdx = days.findIndex(d => d.toDateString() === today.toDateString());
+                if (todayIdx >= 0) {
+                    html += `<div style="position:absolute;left:${todayIdx * dayWidth + dayWidth/2}px;top:0;bottom:0;width:2px;background:#ff4d4f;z-index:5;"></div>`;
+                }
+
+                // 任务条
+                const title = `${task.name}\n状态: ${task.status}\n进度: ${task.progress}%\n${task.start_date} ~ ${task.end_date}\n负责人: ${task.assignee || '-'}`;
+                html += `<div class="gantt-bar bar-${task.status}${isCritical ? ' critical' : ''}" 
+                    style="left:${barStart * dayWidth + 2}px;width:${Math.max(barWidth - 4, 20)}px;" 
+                    title="${escapeHtml(title)}">
+                    ${task.progress > 0 ? `<div class="progress-indicator" style="width:${task.progress}%;"></div>` : ''}
+                    <span style="position:relative;z-index:2;${barWidth < 40 ? 'display:none;' : ''}">${task.progress}%</span>
+                </div>`;
+
+                html += '</div></div>';
+            });
+
+            html += '</div>';
+            container.className = 'gantt-wrapper';
+            container.innerHTML = html;
+        }
+
+        function downloadGanttPDF() {
+            if (!currentProjectId) { alert('请先选择项目'); return; }
+            window.open('/api/projects/' + currentProjectId + '/gantt-pdf', '_blank');
+        }
+
+        // ========== 进度报告 ==========
+        async function renderReport() {
+            const container = document.getElementById('reportContent');
+            if (!currentProjectId) {
+                container.innerHTML = '<div class="empty-state"><h3>请先选择项目</h3></div>';
+                return;
+            }
+            let report;
+            try {
+                report = await api('/api/projects/' + currentProjectId + '/report');
+            } catch(e) { return; }
+
+            let html = '';
+
+            // 统计卡片
+            html += '<div class="stats-grid">';
+            html += `<div class="stat-card"><div class="stat-value">${report.total_duration}</div><div class="stat-label">总工期 (天)</div></div>`;
+            html += `<div class="stat-card"><div class="stat-value">${report.total_tasks}</div><div class="stat-label">总任务数</div></div>`;
+            html += `<div class="stat-card"><div class="stat-value" style="color:#52c41a;">${report.completed_tasks}</div><div class="stat-label">已完成</div></div>`;
+            html += `<div class="stat-card"><div class="stat-value" style="color:#1677ff;">${report.in_progress_tasks}</div><div class="stat-label">进行中</div></div>`;
+            html += `<div class="stat-card"><div class="stat-value" style="color:#999;">${report.not_started_tasks}</div><div class="stat-label">未开始</div></div>`;
+            html += `<div class="stat-card"><div class="stat-value" style="color:#f5222d;">${report.delayed_tasks}</div><div class="stat-label">⚠️ 延期</div></div>`;
+            html += '</div>';
+
+            // 整体进度
+            html += `<div class="card" style="padding:20px;margin-bottom:20px;"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+                <strong>整体项目进度</strong><span style="font-size:24px;font-weight:700;color:#4a6fa5;">${report.overall_progress}%</span></div>
+                <div class="progress-bar-container" style="height:28px;">
+                    <div class="progress-bar-fill" style="width:${report.overall_progress}%;font-size:14px;">${report.overall_progress}%</div>
+                </div></div>`;
+
+            html += '<div class="report-section"><h3>🔥 关键路径</h3>';
+            if (report.critical_path && report.critical_path.length > 0) {
+                html += report.critical_path.map(id => {
+                    const td = report.task_details.find(x => x.id === id);
+                    return `<span class="critical-badge" style="font-size:13px;padding:4px 10px;margin-right:6px;">${td ? escapeHtml(td.name) : id}</span>`;
+                }).join('<span style="color:#fa8c16;"> → </span>');
+            } else {
+                html += '<span style="color:#999;">暂无关键任务</span>';
+            }
+            html += '</div>';
+
+            html += '<div class="report-section"><h3>📋 任务详情</h3>';
+            if (report.task_details && report.task_details.length > 0) {
+                report.task_details.forEach(td => {
+                    const cls = td.is_delayed ? 'report-task-delayed' : (td.is_critical ? 'report-task-critical' : '');
+                    html += `<div class="report-task-item ${cls}">
+                        <div style="display:flex;justify-content:space-between;align-items:start;gap:16px;">
+                            <div style="flex:1;">
+                                <div style="font-weight:600;margin-bottom:6px;">
+                                    ${escapeHtml(td.name)}
+                                    ${td.is_critical ? '<span class="critical-badge">关键任务</span>' : ''}
+                                    ${td.is_delayed ? '<span class="status-badge status-延期">⚠️ 已延期</span>' : ''}
+                                </div>
+                                <div style="font-size:13px;color:#666;">
+                                    📅 ${td.start_date} ~ ${td.end_date} | 👤 ${escapeHtml(td.assignee || '-')}
+                                </div>
+                                <div style="margin-top:8px;display:flex;align-items:center;gap:10px;">
+                                    <span class="status-badge status-${td.status}">${td.status}</span>
+                                    <div style="flex:1;max-width:300px;" class="progress-bar-container">
+                                        <div class="progress-bar-fill" style="width:${td.progress}%">${td.progress > 15 ? td.progress + '%' : ''}</div>
+                                    </div>
+                                    <span style="font-size:13px;">${td.progress}%</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>`;
+                });
+            }
+            html += '</div>';
+
+            container.innerHTML = html;
+        }
+
+        function downloadTextReport() {
+            if (!currentProjectId) { alert('请先选择项目'); return; }
+            window.open('/api/projects/' + currentProjectId + '/report?format=text', '_blank');
+        }
+
+        // ========== 工具函数 ==========
+        function escapeHtml(s) {
+            if (s == null) return '';
+            return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+        }
+
+        // 点击遮罩关闭弹窗
+        document.getElementById('editModal').addEventListener('click', function(e) {
+            if (e.target === this) closeModal();
+        });
+
+        // 初始化
+        loadProjects();
+    </script>
+</body>
+</html>
