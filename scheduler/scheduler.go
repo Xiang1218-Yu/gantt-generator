@@ -24,6 +24,7 @@ func CalculateCriticalPath(project *models.Project) (*models.CriticalPathResult,
 	taskMap := make(map[string]*models.Task)
 	taskSchedule := make(map[string]models.TaskSchedule)
 	taskIDs := []string{}
+	var projectStart time.Time
 
 	for i := range project.Tasks {
 		task := &project.Tasks[i]
@@ -40,6 +41,9 @@ func CalculateCriticalPath(project *models.Project) (*models.CriticalPathResult,
 		}
 		if endDate.Before(startDate) {
 			return nil, fmt.Errorf("任务 %s 结束日期早于开始日期", task.ID)
+		}
+		if projectStart.IsZero() || startDate.Before(projectStart) {
+			projectStart = startDate
 		}
 		duration := int(endDate.Sub(startDate).Hours()/24) + 1 // 包含首尾两天
 
@@ -60,6 +64,11 @@ func CalculateCriticalPath(project *models.Project) (*models.CriticalPathResult,
 		}
 	}
 
+	// 把显式填写的计划开始日期转成相对项目起点的偏移。后续正向计算会把它作为下限。
+	if err := applyPlannedOffsets(taskSchedule, projectStart); err != nil {
+		return nil, err
+	}
+
 	// 2. 拓扑排序并检测环
 	topologicalOrder, err := topologicalSort(taskIDs, func(id string) []string {
 		return taskMap[id].Dependencies
@@ -73,8 +82,8 @@ func CalculateCriticalPath(project *models.Project) (*models.CriticalPathResult,
 		sched := taskSchedule[id]
 		task := taskMap[id]
 
-		// 找到所有前置依赖中最大的最早完成时间
-		maxEF := 0
+		// 计划日期是最早开始时间的下限；依赖晚于计划时，再等待最晚的前置完成。
+		maxEF := sched.PlannedStart
 		for _, depID := range task.Dependencies {
 			depSched := taskSchedule[depID]
 			if depSched.EarliestFinish > maxEF {
