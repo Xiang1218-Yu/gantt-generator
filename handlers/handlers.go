@@ -180,18 +180,18 @@ func (h *Handler) UpdateTask(w http.ResponseWriter, r *http.Request) {
 	projectID := pathParts[2]
 	taskID := pathParts[4]
 
-	var task models.Task
-	if err := parseJSON(r, &task); err != nil {
+	var patch models.TaskPatch
+	if err := parseJSON(r, &patch); err != nil {
 		writeError(w, http.StatusBadRequest, "无效的请求数据: "+err.Error())
 		return
 	}
-	task.ID = taskID
 
-	if err := h.store.UpdateTask(projectID, &task); err != nil {
-		writeError(w, http.StatusInternalServerError, err.Error())
+	updated, err := h.store.PatchTask(projectID, taskID, patch)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
 		return
 	}
-	writeJSON(w, http.StatusOK, task)
+	writeJSON(w, http.StatusOK, updated)
 }
 
 // DeleteTask 删除任务

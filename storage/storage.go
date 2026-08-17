@@ -179,6 +179,38 @@ func (s *Store) AddTask(projectID string, task *models.Task) error {
 }
 
 // UpdateTask 更新项目中的任务
+// PatchTask 对已有任务应用部分更新，省略的字段会保留原值。
+func (s *Store) PatchTask(projectID, taskID string, patch models.TaskPatch) (*models.Task, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	projects, err := s.loadProjects()
+	if err != nil {
+		return nil, err
+	}
+	for i := range projects {
+		if projects[i].ID != projectID {
+			continue
+		}
+		for j := range projects[i].Tasks {
+			if projects[i].Tasks[j].ID != taskID {
+				continue
+			}
+			if err := models.ApplyTaskPatch(&projects[i].Tasks[j], patch); err != nil {
+				return nil, err
+			}
+			projects[i].UpdatedAt = time.Now().Format(time.RFC3339)
+			saved := projects[i].Tasks[j]
+			if err := s.saveProjects(projects); err != nil {
+				return nil, err
+			}
+			return &saved, nil
+		}
+		return nil, fmt.Errorf("任务不存在: %s", taskID)
+	}
+	return nil, fmt.Errorf("项目不存在: %s", projectID)
+}
+
 func (s *Store) UpdateTask(projectID string, task *models.Task) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
