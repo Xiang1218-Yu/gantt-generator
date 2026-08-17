@@ -89,6 +89,9 @@ func (s *Store) GetProject(id string) (*models.Project, error) {
 
 // CreateProject 创建新项目
 func (s *Store) CreateProject(project *models.Project) error {
+	if err := models.ValidateProjectTasks(project); err != nil {
+		return err
+	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	projects, err := s.loadProjects()
@@ -107,6 +110,9 @@ func (s *Store) CreateProject(project *models.Project) error {
 
 // UpdateProject 更新项目
 func (s *Store) UpdateProject(project *models.Project) error {
+	if err := models.ValidateProjectTasks(project); err != nil {
+		return err
+	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	projects, err := s.loadProjects()
@@ -174,6 +180,14 @@ func (s *Store) AddTask(projectID string, task *models.Task) error {
 	}
 	if !found {
 		return fmt.Errorf("项目不存在: %s", projectID)
+	}
+	for i := range projects {
+		if projects[i].ID == projectID {
+			if err := models.ValidateProjectTasks(&projects[i]); err != nil {
+				return err
+			}
+			break
+		}
 	}
 	return s.saveProjects(projects)
 }

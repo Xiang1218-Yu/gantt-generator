@@ -91,7 +91,7 @@ func (h *Handler) CreateProject(w http.ResponseWriter, r *http.Request) {
 		project.ID = generateID()
 	}
 	if err := h.store.CreateProject(&project); err != nil {
-		writeError(w, http.StatusInternalServerError, err.Error())
+		writeError(w, http.StatusBadRequest, err.Error())
 		return
 	}
 	writeJSON(w, http.StatusCreated, project)
@@ -111,7 +111,7 @@ func (h *Handler) UpdateProject(w http.ResponseWriter, r *http.Request) {
 	}
 	project.ID = id
 	if err := h.store.UpdateProject(&project); err != nil {
-		writeError(w, http.StatusInternalServerError, err.Error())
+		writeError(w, http.StatusBadRequest, err.Error())
 		return
 	}
 	writeJSON(w, http.StatusOK, project)

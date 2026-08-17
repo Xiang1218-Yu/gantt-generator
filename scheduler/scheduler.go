@@ -12,6 +12,9 @@ const dateLayout = "2006-01-02"
 
 // CalculateCriticalPath 计算关键路径
 func CalculateCriticalPath(project *models.Project) (*models.CriticalPathResult, error) {
+	if err := models.ValidateProjectTasks(project); err != nil {
+		return nil, err
+	}
 	if len(project.Tasks) == 0 {
 		return &models.CriticalPathResult{
 			CriticalPath:  []string{},
